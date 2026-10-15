@@ -38,18 +38,23 @@ def run_suite(suite: str) -> dict[str, Any]:
     tasks = _load_tasks(suite_dir)
     known = load_tool_names(ROOT / "schemas" / "tools.json")
     reports = []
+    modes: list[str] = []
     for task in tasks:
         task = dict(task)
         task["_known_tools"] = known
         with tempfile.TemporaryDirectory() as td:
             db = Path(td) / "tickets.db"
             result = run_sut(task, str(db))
+            mode_actual = getattr(result, "sut_mode_actual", "unknown")
+            modes.append(mode_actual)
             run_blob = {
                 "final": result.final,
                 "trajectory": _serialize_traj(result),
                 "ticket_snapshot": result.ticket_snapshot,
             }
-            reports.append(evaluate(task, run_blob))
+            ev = evaluate(task, run_blob)
+            ev["sut_mode_actual"] = mode_actual
+            reports.append(ev)
     passed = sum(1 for r in reports if r["pass"])
     n = len(reports)
     final_accuracy = (sum(1 for r in reports if r.get("final_ok")) / n) if n else 0.0
@@ -63,6 +68,7 @@ def run_suite(suite: str) -> dict[str, Any]:
         "failed": n - passed,
         "final_accuracy": final_accuracy,
         "trajectory_compliance": trajectory_compliance,
+        "sut_mode_actual": sorted(set(modes)),
         "results": reports,
     }
 
@@ -84,11 +90,15 @@ def main(argv: list[str] | None = None) -> None:
         args.out.write_text(text, encoding="utf-8")
     print(text)
     if args.suite == "divergence":
-        # Demo suite: success means every case forks (final OK, trajectory FAIL).
-        ok = bool(report["results"]) and all(
+        # Demo suite: every case forks AND suite means match exactly.
+        cases_ok = bool(report["results"]) and all(
             r.get("final_ok") and not r.get("trajectory_ok") for r in report["results"]
         )
-        raise SystemExit(0 if ok else 1)
+        means_ok = (
+            report.get("final_accuracy") == 1.0
+            and report.get("trajectory_compliance") == 0.0
+        )
+        raise SystemExit(0 if (cases_ok and means_ok) else 1)
     if report["failed"]:
         raise SystemExit(1)
 

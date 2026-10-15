@@ -2,7 +2,7 @@
 
 **Agent Eval Harness** + thin fake-ticket **SUT** (real LangGraph `StateGraph` + scripted planner fallback).
 
-Interview story: prove an agent is *measurable* (final state + trajectory compliance), not another chat UI.
+Interview story: prove an agent is *measurable* (final state + trajectory compliance), not another chat UI. Orchestration is a real LangGraph `StateGraph`; decisions stay a deterministic scripted planner (no API key).
 
 Chinese brief / 中文简介：本地一键跑的 Agent 评测框架；被测件是可回滚的假工单 Agent，必演示熔断 / 重试 / 拒越权。
 
@@ -57,7 +57,7 @@ No public hosting, no paid cloud deps, no outbound messaging, no real ticket Saa
 
 **W1** passed: metrics split (`final_accuracy` / `trajectory_compliance`); **`harness/tasks` 20/20**.
 
-**SUT**: real LangGraph `StateGraph` by default; `TICKETBENCH_SUT_MODE=scripted` (and runtime fallback) keeps the no-key imperative loop. Planner stays deterministic scripted (no API key).
+**SUT**: real LangGraph `StateGraph` by default (`sut_mode_actual=langgraph` in reports). Explicit `TICKETBENCH_SUT_MODE=scripted` for the imperative path. Graph failures are **not** silently swallowed; opt-in only with `TICKETBENCH_SUT_ALLOW_FALLBACK=1` → `sut_mode_actual=scripted_fallback` + log. Planner stays deterministic scripted (interview: graph real, decisions scripted).
 
 **W2** (current `main`): `evals/divergence` (**2**) proves metric fork — suite exits 0 iff every case is `final_ok && !trajectory_ok` (`final_accuracy=1.0`, `trajectory_compliance=0.0`). **Not** a CI holdout gate.
 

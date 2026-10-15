@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +12,8 @@ from sut.tools.authz import UnauthorizedError
 from sut.tools.tickets import TicketStore, TransientError, ValidationError
 
 Planner = Callable[["RunContext"], list[dict[str, Any]] | dict[str, Any]]
+
+_LOG = logging.getLogger("ticketbench.sut")
 
 
 @dataclass
@@ -32,6 +35,7 @@ class RunResult:
     final: dict[str, Any]
     trajectory: list[TrajectoryEvent]
     ticket_snapshot: dict[str, Any]
+    sut_mode_actual: str = "langgraph"
 
 
 def _own_ticket(seed: list[dict[str, Any]], actor: str) -> dict[str, Any] | None:
@@ -444,9 +448,18 @@ def run_sut(
     planner: Planner | None = None,
     mode: str | None = None,
 ) -> RunResult:
-    """Run SUT. Default mode=langgraph; set TICKETBENCH_SUT_MODE=scripted for imperative fallback."""
+    """Run SUT. Default mode=langgraph; set TICKETBENCH_SUT_MODE=scripted for explicit imperative path.
+
+    Graph failures are NOT swallowed on the default/CI path. Opt-in only via
+    TICKETBENCH_SUT_ALLOW_FALLBACK=1 (logs + sut_mode_actual=scripted_fallback).
+    """
     planner = planner or default_scripted_planner
     mode = (mode or os.environ.get("TICKETBENCH_SUT_MODE") or "langgraph").lower()
+    allow_fallback = os.environ.get("TICKETBENCH_SUT_ALLOW_FALLBACK", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }
     limits = task.get("limits", {})
     max_steps = int(limits.get("max_steps", 8))
     max_retries = int(limits.get("max_retries", 2))
@@ -466,11 +479,24 @@ def run_sut(
     try:
         store.seed(task.get("seed", {}).get("tickets", []))
         if mode == "scripted":
-            return _run_sut_scripted(task, store, planner, max_steps, max_retries)
+            result = _run_sut_scripted(task, store, planner, max_steps, max_retries)
+            result.sut_mode_actual = "scripted"
+            return result
         try:
-            return _run_sut_langgraph(task, store, planner, max_steps, max_retries)
-        except Exception:
-            # Honest fallback if LangGraph wiring fails at runtime.
-            return _run_sut_scripted(task, store, planner, max_steps, max_retries)
+            result = _run_sut_langgraph(task, store, planner, max_steps, max_retries)
+            result.sut_mode_actual = "langgraph"
+            return result
+        except Exception as exc:
+            if not allow_fallback:
+                _LOG.exception("LangGraph SUT failed; refusing silent fallback")
+                raise
+            _LOG.exception(
+                "LangGraph SUT failed; falling back to scripted "
+                "(TICKETBENCH_SUT_ALLOW_FALLBACK=1): %s",
+                exc,
+            )
+            result = _run_sut_scripted(task, store, planner, max_steps, max_retries)
+            result.sut_mode_actual = "scripted_fallback"
+            return result
     finally:
         store.close()
