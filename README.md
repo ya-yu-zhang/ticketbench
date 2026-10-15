@@ -35,7 +35,7 @@ Holdout mirrors these with positive/negative pairs (authz refuse, same-tenant OK
 ```bash
 ticketbench-run smoke
 ticketbench-run holdout   # CI default (10/10 on current main)
-ticketbench-run tasks     # tunable set (2 samples; expanding in W1 toward ≥20)
+ticketbench-run tasks     # tunable set (≥20 on current main)
 ```
 
 ## Non-goals
@@ -44,12 +44,14 @@ No public hosting, no paid cloud deps, no outbound messaging, no real ticket Saa
 
 ## Status
 
-**W0 (current `main`)** — conditional pass:
-- Isolation layout + `schemas/tools.json` + MIT + `.gitignore` (`.env` / `*.db` / `.venv`)
-- **Holdout: 10/10** covering authz ±, same-tenant success, tripwire ±, retry, validation no-retry
-- Smoke **3/3**; scripted planner is the **honest** execution mode today (no API key)
-- `langgraph` is installed; **W1** swaps in a real LangGraph `StateGraph`
-- Known gaps (tracked, not blocking W0 close): `final_accuracy` and `trajectory_compliance` currently share pass-rate (split in W1); `harness/tasks` only 2 (≥20 in W1); formal `.github/workflows` needs `workflow` token scope — draft at `harness/ci_draft/ci.yml.example`; static panel in W4
+**W0** closed on isolation + holdout 10/10 + smoke 3/3 (scripted planner).
+
+**W1 (current `main`)**:
+- Metrics split: `final_accuracy` = mean(`final_ok`), `trajectory_compliance` = mean(`trajectory_ok`) (independent; overall pass requires both)
+- **`harness/tasks`: 20/20** (create / same-tenant / list / authz / tripwire / retry / validation)
+- Holdout still **10/10**; smoke **3/3**
+- Scripted planner remains the honest no-key mode; real LangGraph `StateGraph` still queued
+- Formal `.github/workflows` still needs `workflow` token scope — draft at `harness/ci_draft/ci.yml.example`; static panel in W4
 
 ## Secrets
 

@@ -1,7 +1,7 @@
 {
   "id": "tasks_create_ok_01",
   "suite": "tasks",
-  "prompt": "Create a medium priority ticket.",
+  "prompt": "Create ticket #1.",
   "actor_tenant": "t_a",
   "seed": {
     "tickets": []

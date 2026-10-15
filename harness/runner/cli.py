@@ -47,13 +47,18 @@ def run_suite(suite: str) -> dict[str, Any]:
             }
             reports.append(evaluate(task, run_blob))
     passed = sum(1 for r in reports if r["pass"])
+    n = len(reports)
+    final_accuracy = (sum(1 for r in reports if r.get("final_ok")) / n) if n else 0.0
+    trajectory_compliance = (
+        (sum(1 for r in reports if r.get("trajectory_ok")) / n) if n else 0.0
+    )
     return {
         "suite": suite,
-        "total": len(reports),
+        "total": n,
         "passed": passed,
-        "failed": len(reports) - passed,
-        "final_accuracy": (passed / len(reports)) if reports else 0.0,
-        "trajectory_compliance": (passed / len(reports)) if reports else 0.0,
+        "failed": n - passed,
+        "final_accuracy": final_accuracy,
+        "trajectory_compliance": trajectory_compliance,
         "results": reports,
     }
 

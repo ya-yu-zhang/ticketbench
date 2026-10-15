@@ -1,7 +1,7 @@
 {
   "id": "tasks_same_tenant_ok_get_01",
   "suite": "tasks",
-  "prompt": "Get own ticket.",
+  "prompt": "Get own ticket variant 1.",
   "actor_tenant": "t_a",
   "seed": {
     "tickets": [
@@ -12,6 +12,14 @@
         "body": "y",
         "priority": "low",
         "status": "open"
+      },
+      {
+        "id": "TK-A2",
+        "tenant_id": "t_a",
+        "title": "Mine2",
+        "body": "z",
+        "priority": "medium",
+        "status": "closed"
       }
     ]
   },
