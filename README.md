@@ -32,7 +32,7 @@ Creates a venv, installs the package, runs the **smoke** suite (target ≤5 minu
 | 1:30 | Retry | `python scripts/demo_case.py evals/smoke/smoke_retry_01.json` · ![retry](docs/demo_retry.gif) |
 | 2:30 | Authz refuse | `python scripts/demo_case.py evals/smoke/smoke_authz_01.json` · ![authz](docs/demo_authz.gif) |
 | 3:30 | Metric fork | `ticketbench-run divergence` → `final_accuracy=1.0`, `trajectory_compliance=0.0` |
-| 4:30 | Honest close | Real LangGraph `StateGraph` orchestration; decisions are a **deterministic scripted planner** — no LLM in v0.1 |
+| 4:30 | Honest close | Baseline: LangGraph + **scripted** planner (CI, no key). Optional live demo: `TICKETBENCH_SUT_MODE=llm` + `OPENROUTER_API_KEY` (see **Live LLM mode**) |
 
 Regenerate GIFs (needs Pillow):
 
@@ -93,7 +93,7 @@ No public hosting, no paid cloud deps, no outbound messaging, no real ticket Saa
 
 **W1** passed: metrics split (`final_accuracy` / `trajectory_compliance`); **`harness/tasks` 20/20**.
 
-**SUT**: real LangGraph `StateGraph` by default (`sut_mode_actual=langgraph` in reports). Explicit `TICKETBENCH_SUT_MODE=scripted` for the imperative path. Graph failures are **not** silently swallowed; opt-in only with `TICKETBENCH_SUT_ALLOW_FALLBACK=1` → `sut_mode_actual=scripted_fallback` + log. Planner stays deterministic scripted (interview: graph real, decisions scripted).
+**SUT**: real LangGraph `StateGraph` by default (`sut_mode_actual=langgraph` in reports). Explicit `TICKETBENCH_SUT_MODE=scripted` for the imperative path. Graph failures are **not** silently swallowed; opt-in only with `TICKETBENCH_SUT_ALLOW_FALLBACK=1` → `sut_mode_actual=scripted_fallback` + log. Default planner is deterministic scripted (CI / interview baseline). Optional `TICKETBENCH_SUT_MODE=llm` swaps in an OpenRouter step planner (see **Live LLM mode**).
 
 **W2** (current `main`): `evals/divergence` (**2**) proves metric fork — suite exits 0 iff every case is `final_ok && !trajectory_ok` (`final_accuracy=1.0`, `trajectory_compliance=0.0`). **Not** a CI holdout gate.
 
@@ -110,4 +110,4 @@ bash scripts/check_public_hygiene.sh
 Checks: no `.env` / key-like paths in the git index; author emails on commits you are about to push must be `*@users.noreply.github.com`. Historical authors are warned only (this repo does not rewrite history).
 
 
-Do **not** commit API keys. If you later wire a live LLM, use environment variables (e.g. `OPENAI_API_KEY`) and a local `.env` that is gitignored. This repo ships with no `.env` and no credentials.
+Do **not** commit API keys. Live LLM uses `OPENROUTER_API_KEY` from the environment (see `.env.example`); keep `.env` gitignored. This repo ships with no `.env` and no credentials.
