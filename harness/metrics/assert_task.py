@@ -120,11 +120,22 @@ def evaluate(task: dict[str, Any], run: dict[str, Any]) -> dict[str, Any]:
             ):
                 labels.append("F_FINAL")
 
-    # 6) must_call
+    # 6) must_call / must_not_call (trajectory-only; no side-effect required)
     for req in traj_exp.get("must_call", []):
         tool = req.get("tool") if isinstance(req, dict) else req
         if not any(c.get("data", {}).get("tool") == tool for c in calls):
             labels.append("F_TRAJECTORY")
+
+    for banned in traj_exp.get("must_not_call", []):
+        tool = banned.get("tool") if isinstance(banned, dict) else banned
+        where = (banned.get("where") or {}) if isinstance(banned, dict) else {}
+        for c in calls:
+            if c.get("data", {}).get("tool") != tool:
+                continue
+            args = c.get("data", {}).get("args") or {}
+            if all(args.get(k) == v for k, v in where.items()):
+                labels.append("F_TRAJECTORY")
+                break
 
     seen: set[str] = set()
     uniq: list[str] = []

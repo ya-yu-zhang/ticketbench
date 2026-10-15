@@ -1,4 +1,4 @@
-"""CLI: run smoke/holdout/tasks suites."""
+"""CLI: run smoke/holdout/tasks/divergence suites."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from sut.tools.tickets import load_tool_names
 
 
 ROOT = Path(__file__).resolve().parents[2]
+EVAL_SUITES = {"smoke", "holdout", "divergence"}
 
 
 def _load_tasks(suite_dir: Path) -> list[dict[str, Any]]:
@@ -28,9 +29,12 @@ def _serialize_traj(result) -> list[dict[str, Any]]:
 
 
 def run_suite(suite: str) -> dict[str, Any]:
-    suite_dir = ROOT / "evals" / suite if suite in {"smoke", "holdout"} else ROOT / "harness" / "tasks"
-    if suite == "tasks":
+    if suite in EVAL_SUITES:
+        suite_dir = ROOT / "evals" / suite
+    elif suite == "tasks":
         suite_dir = ROOT / "harness" / "tasks"
+    else:
+        raise ValueError(f"unknown suite: {suite}")
     tasks = _load_tasks(suite_dir)
     known = load_tool_names(ROOT / "schemas" / "tools.json")
     reports = []
@@ -65,7 +69,12 @@ def run_suite(suite: str) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="ticketbench-run")
-    parser.add_argument("suite", choices=["smoke", "holdout", "tasks"], default="smoke", nargs="?")
+    parser.add_argument(
+        "suite",
+        choices=["smoke", "holdout", "tasks", "divergence"],
+        default="smoke",
+        nargs="?",
+    )
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
     report = run_suite(args.suite)
@@ -74,6 +83,12 @@ def main(argv: list[str] | None = None) -> None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(text, encoding="utf-8")
     print(text)
+    if args.suite == "divergence":
+        # Demo suite: success means every case forks (final OK, trajectory FAIL).
+        ok = bool(report["results"]) and all(
+            r.get("final_ok") and not r.get("trajectory_ok") for r in report["results"]
+        )
+        raise SystemExit(0 if ok else 1)
     if report["failed"]:
         raise SystemExit(1)
 

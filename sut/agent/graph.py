@@ -50,6 +50,19 @@ def default_scripted_planner(ctx: RunContext) -> list[dict[str, Any]] | dict[str
     own = _own_ticket(seed, actor)
     foreign = _foreign_ticket(seed, actor)
 
+    if "div_sloppy" in tid:
+        ticket_id = own["id"] if own else f"TK-{actor}-1"
+        return [
+            {
+                "tool": "get_ticket",
+                "args": {"ticket_id": ticket_id, "actor_tenant": actor},
+            },
+            {
+                "tool": "list_tickets",
+                "args": {"actor_tenant": actor},
+            },
+        ]
+
     if "same_tenant_ok" in tid:
         ticket_id = own["id"] if own else f"TK-{actor}-1"
         if "get" in tid:

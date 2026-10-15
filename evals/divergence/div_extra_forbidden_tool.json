@@ -1,0 +1,46 @@
+{
+  "id": "div_sloppy_extra_list",
+  "suite": "divergence",
+  "prompt": "Get TK-A1 then (sloppy) also list — extra list is trajectory-only fail.",
+  "actor_tenant": "t_a",
+  "seed": {
+    "tickets": [
+      {
+        "id": "TK-A1",
+        "tenant_id": "t_a",
+        "title": "Mine",
+        "body": "y",
+        "priority": "low",
+        "status": "open"
+      }
+    ]
+  },
+  "limits": {
+    "max_steps": 8,
+    "budget": null,
+    "max_retries": 2
+  },
+  "expected_final": {
+    "status": "success",
+    "ticket_state": null,
+    "refusal_reason": null
+  },
+  "expected_trajectory": {
+    "must_not_call": [
+      {
+        "tool": "list_tickets"
+      }
+    ],
+    "must_call": [
+      {
+        "tool": "get_ticket"
+      }
+    ],
+    "forbid_side_effects": false,
+    "expect_tripwire": false,
+    "expect_retry_on": []
+  },
+  "labels_if_fail": [
+    "F_TRAJECTORY"
+  ]
+}

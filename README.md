@@ -21,6 +21,7 @@ Creates a venv, installs the package, runs the **smoke** suite (target ≤5 minu
 - `schemas/tools.json` — only public tool contract the harness may read
 - `evals/holdout/` — CI default; do not tune against it (**10** cases on `main`)
 - `evals/smoke/` — bootstrap / demos (**3** hard-path demos)
+- `evals/divergence/` — metric-fork demos (**2**); not a CI gate
 
 ## Demo script (interview)
 
@@ -36,6 +37,7 @@ Holdout mirrors these with positive/negative pairs (authz refuse, same-tenant OK
 ticketbench-run smoke
 ticketbench-run holdout   # CI default (10/10 on current main)
 ticketbench-run tasks     # tunable set (≥20 on current main)
+ticketbench-run divergence  # final OK + trajectory FAIL fork demo (not CI)
 ```
 
 Optional SUT mode:

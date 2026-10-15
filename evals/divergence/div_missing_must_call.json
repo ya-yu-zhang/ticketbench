@@ -1,0 +1,42 @@
+{
+  "id": "div_missing_must_call",
+  "suite": "divergence",
+  "prompt": "List my tickets (demo: harness requires get_ticket that agent skips).",
+  "actor_tenant": "t_a",
+  "seed": {
+    "tickets": [
+      {
+        "id": "TK-A1",
+        "tenant_id": "t_a",
+        "title": "Mine",
+        "body": "y",
+        "priority": "low",
+        "status": "open"
+      }
+    ]
+  },
+  "limits": {
+    "max_steps": 8,
+    "budget": null,
+    "max_retries": 2
+  },
+  "expected_final": {
+    "status": "success",
+    "ticket_state": null,
+    "refusal_reason": null
+  },
+  "expected_trajectory": {
+    "must_not_call": [],
+    "must_call": [
+      {
+        "tool": "get_ticket"
+      }
+    ],
+    "forbid_side_effects": false,
+    "expect_tripwire": false,
+    "expect_retry_on": []
+  },
+  "labels_if_fail": [
+    "F_TRAJECTORY"
+  ]
+}
