@@ -31,22 +31,29 @@ def _load_tools() -> tuple[str, set[str]]:
 
 
 def _extract_json(text: str) -> dict[str, Any]:
+    """Parse the first complete JSON object; tolerate trailing Extra data."""
     text = text.strip()
     if not text:
         raise LlmPlannerError("empty model text; cannot parse JSON action")
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
+        text = re.sub(r"\s*```$", "", text).strip()
+    decoder = json.JSONDecoder()
+    # Prefer raw_decode from the first '{': survives trailing prose / second blobs.
+    start = text.find("{")
+    if start < 0:
+        raise LlmPlannerError(f"model output is not JSON: {text[:200]!r}")
     try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.DOTALL)
+        data, _end = decoder.raw_decode(text[start:])
+    except json.JSONDecodeError as e:
+        # Fallback: non-greedy object slice then raw_decode again
+        m = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text[start:], re.DOTALL)
         if not m:
-            raise LlmPlannerError(f"model output is not JSON: {text[:200]!r}")
-        try:
-            data = json.loads(m.group(0))
-        except json.JSONDecodeError as e:
             raise LlmPlannerError(f"JSON parse failed: {e}") from e
+        try:
+            data, _end = decoder.raw_decode(m.group(0))
+        except json.JSONDecodeError as e2:
+            raise LlmPlannerError(f"JSON parse failed: {e2}") from e2
     if not isinstance(data, dict):
         raise LlmPlannerError("model JSON must be an object")
     return data

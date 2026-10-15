@@ -16,7 +16,7 @@ Live LLM: `TICKETBENCH_SUT_MODE=llm` with OpenRouter (default `nex-agi/nex-n2.5-
 
 1. **null content** — client falls back to `reasoning` / `reasoning_content`; default `max_tokens=512` (`OPENROUTER_MAX_TOKENS`).
 2. **empty plan first turn** — per-step graph refuses with `llm_no_action` instead of `success`.
-3. **JSON / invalid action** — `LlmPlannerError` → trajectory `planner_error` + `refused` (not treated as done); one soft re-ask inside the planner.
+3. **JSON / invalid action** — `LlmPlannerError` → trajectory `planner_error` + `refused` (not treated as done); one soft re-ask inside the planner. `_extract_json` uses `JSONDecoder.raw_decode` so trailing Extra data after the first object is ignored.
 4. **Tools** — planner loads names from `schemas/tools.json` (includes `list_tickets`, `update_status`).
 
 LLM smoke is non-deterministic; 3/3 is a target, not a CI gate without a key.
