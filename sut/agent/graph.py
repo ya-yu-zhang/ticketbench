@@ -317,6 +317,39 @@ def _build_langgraph(store: TicketStore, planner: Planner, *, per_step: bool = F
                     "trajectory": traj,
                     "stop": True,
                 }
+            # LLM early-stop on listing loops: one list_tickets then done would
+            # fake-success tripwire tasks. Keep listing until max_steps.
+            max_steps = int(state["task"].get("limits", {}).get("max_steps") or 8)
+            last_tool = None
+            for e in reversed(traj):
+                if isinstance(e, dict) and e.get("type") == "tool_call":
+                    last_tool = (e.get("data") or {}).get("tool")
+                    break
+            if (
+                per_step
+                and had_tool
+                and step < max_steps
+                and last_tool == "list_tickets"
+                and state.get("status") != "refused"
+            ):
+                actor = state["task"]["actor_tenant"]
+                traj.append(
+                    {
+                        "type": "planner_nudge",
+                        "data": {
+                            "reason": "early_done_on_list",
+                            "msg": "empty plan before max_steps after list_tickets; continue",
+                        },
+                    }
+                )
+                call = {"tool": "list_tickets", "args": {"actor_tenant": actor}}
+                return {
+                    "planned": False,
+                    "pending": [],
+                    "loop_tool": None,
+                    "pending_call": call,
+                    "trajectory": traj,
+                }
             traj.append({"type": "finalize", "data": {"status": state.get("status", "success")}})
             return {"planned": planned, "pending": [], "loop_tool": None, "trajectory": traj, "stop": True}
 

@@ -19,6 +19,8 @@ Live LLM: `TICKETBENCH_SUT_MODE=llm` with OpenRouter (default `nex-agi/nex-n2.5-
 3. **JSON / invalid action** — `LlmPlannerError` → trajectory `planner_error` + `refused` (not treated as done); one soft re-ask inside the planner. `_extract_json` uses `JSONDecoder.raw_decode` so trailing Extra data after the first object is ignored.
 4. **Tools** — planner loads names from `schemas/tools.json` (includes `list_tickets`, `update_status`).
 
+5. **list early-stop** — empty plan after `list_tickets` before `max_steps` auto-continues listing (avoids tripwire fake success).
+
 LLM smoke is non-deterministic; 3/3 is a target, not a CI gate without a key.
 
 ## Cost
