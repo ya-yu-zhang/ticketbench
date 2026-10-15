@@ -74,6 +74,8 @@ TICKETBENCH_SUT_MODE=llm ticketbench-run smoke
 
 `sut_mode_actual` becomes `llm`. Orchestration is still LangGraph; only the planner calls OpenRouter. Missing key → hard error (no silent fallback). See `.env.example`.
 
+Compare notes (scripted vs llm smoke): [`docs/llm_vs_scripted_smoke.md`](docs/llm_vs_scripted_smoke.md).
+
 ## Trace panel (static HTML)
 
 ```bash
