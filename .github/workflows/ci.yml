@@ -15,7 +15,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Isolation check (harness must not read SUT prompts)
         run: |
-          if grep -R "sut.agent.prompts" harness -n; then
+          # Only scan Python sources so the check string in this YAML cannot self-match.
+          if grep -R --include='*.py' -n "sut.agent.prompts" harness; then
             echo "Harness must not read SUT prompts" >&2
             exit 1
           fi
