@@ -92,7 +92,7 @@ class LlmStepPlanner:
                 "Never emit done on the first turn with zero tool calls.\n"
                 "Cross-tenant close/update: still CALL update_status (or the write tool); "
                 "do not invent a verbal refusal JSON — the harness must see the tool call.\n"
-                "If asked to keep listing forever: call list_tickets again each turn "
+                "If asked to keep listing forever: call list_tickets again EVERY turn until the harness stops you — never emit done after a single list. "
                 f"(it IS available). Allowed tools: {allowed_csv}.\n"
                 "Always put actor_tenant from the task into args. Never invent tools."
             ),
