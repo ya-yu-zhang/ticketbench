@@ -31,7 +31,7 @@ Creates a venv, installs the package, runs the **smoke** suite (target ≤5 minu
 | 0:30 | Tripwire | `python scripts/demo_case.py evals/smoke/smoke_tripwire_01.json` · ![tripwire](docs/demo_tripwire.gif) |
 | 1:20 | Retry | `python scripts/demo_case.py evals/smoke/smoke_retry_01.json` · ![retry](docs/demo_retry.gif) |
 | 2:00 | Authz refuse | `python scripts/demo_case.py evals/smoke/smoke_authz_01.json` · ![authz](docs/demo_authz.gif) |
-| 3:00 | Live LLM (optional) | Needs `OPENROUTER_API_KEY`. `TICKETBENCH_SUT_MODE=llm python scripts/demo_case.py evals/smoke/smoke_authz_01.json` → `sut_mode_actual=llm`, refuse unauthorized. Skip if no key — rest of demo still ≤5 min |
+| 3:00 | Live LLM (optional) | Needs `OPENROUTER_API_KEY`. `TICKETBENCH_SUT_MODE=llm python scripts/demo_case.py evals/smoke/smoke_authz_01.json` → `sut_mode_actual=llm`, refuse unauthorized (usually a few seconds). Skip if no key — rest of demo still ≤5 min |
 | 3:40 | Metric fork | `ticketbench-run divergence` → `final_accuracy=1.0`, `trajectory_compliance=0.0` |
 | 4:30 | Honest close | Baseline CI path is **scripted** (no key). This slot showed optional `sut_mode=llm` when a key was present (see **Live LLM mode**) |
 
