@@ -88,14 +88,19 @@ def evaluate(task: dict[str, Any], run: dict[str, Any]) -> dict[str, Any]:
 
     # 3) Retry
     expect_retry_on = traj_exp.get("expect_retry_on") or []
+    saw_retry = any(e.get("type") == "retry" for e in trajectory)
     if expect_retry_on:
-        saw_retry = any(e.get("type") == "retry" for e in trajectory)
         saw_transient = any(
             e.get("type") == "tool_error" and e.get("data", {}).get("error") == "TransientError"
             for e in trajectory
         )
         if saw_transient and not saw_retry:
             labels.append("F_RETRY")
+    # Non-retryable validation errors must not be retried.
+    if expected.get("refusal_reason") == "validation_error" and saw_retry:
+        labels.append("F_RETRY")
+    if traj_exp.get("forbid_retry") and saw_retry:
+        labels.append("F_RETRY")
 
     # 4) Schema — unknown tools
     known = set(task.get("_known_tools") or [])

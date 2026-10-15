@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,13 +15,19 @@ class TransientError(RuntimeError):
     """Injected flaky tool failure for retry demos."""
 
 
+class ValidationError(ValueError):
+    """Injected permanent validation failure — must NOT be retried."""
+
+
 @dataclass
 class TicketStore:
     db_path: Path
-    fail_once_tools: set[str] | None = None
+    fail_once_tools: set[str] = field(default_factory=set)
+    always_fail_tools: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.fail_once_tools = set(self.fail_once_tools or [])
+        self.always_fail_tools = dict(self.always_fail_tools or {})
         self._failed: set[str] = set()
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
@@ -79,13 +85,16 @@ class TicketStore:
         ]
         return {"tickets": tickets, "comments": comments}
 
-    def _maybe_transient(self, tool: str) -> None:
+    def _maybe_fail(self, tool: str) -> None:
+        kind = self.always_fail_tools.get(tool)
+        if kind == "validation":
+            raise ValidationError(f"injected permanent validation failure for {tool}")
         if tool in self.fail_once_tools and tool not in self._failed:
             self._failed.add(tool)
             raise TransientError(f"injected failure for {tool}")
 
     def get_ticket(self, ticket_id: str, actor_tenant: str) -> dict[str, Any]:
-        self._maybe_transient("get_ticket")
+        self._maybe_fail("get_ticket")
         row = self.conn.execute(
             "SELECT id, tenant_id, title, body, priority, status FROM tickets WHERE id=?",
             (ticket_id,),
@@ -96,7 +105,7 @@ class TicketStore:
         return dict(row)
 
     def list_tickets(self, actor_tenant: str, status: str | None = None) -> list[dict[str, Any]]:
-        self._maybe_transient("list_tickets")
+        self._maybe_fail("list_tickets")
         if status:
             rows = self.conn.execute(
                 "SELECT id, tenant_id, title, body, priority, status FROM tickets"
@@ -114,7 +123,7 @@ class TicketStore:
     def create_ticket(
         self, actor_tenant: str, title: str, body: str, priority: str
     ) -> dict[str, Any]:
-        self._maybe_transient("create_ticket")
+        self._maybe_fail("create_ticket")
         ticket_id = f"TK-{actor_tenant}-{self.conn.total_changes + 1}"
         self.conn.execute(
             "INSERT INTO tickets(id, tenant_id, title, body, priority, status)"
@@ -125,7 +134,7 @@ class TicketStore:
         return self.get_ticket(ticket_id, actor_tenant)
 
     def update_status(self, ticket_id: str, actor_tenant: str, status: str) -> dict[str, Any]:
-        self._maybe_transient("update_status")
+        self._maybe_fail("update_status")
         row = self.conn.execute(
             "SELECT tenant_id FROM tickets WHERE id=?", (ticket_id,)
         ).fetchone()
@@ -139,7 +148,7 @@ class TicketStore:
         return self.get_ticket(ticket_id, actor_tenant)
 
     def add_comment(self, ticket_id: str, actor_tenant: str, text: str) -> dict[str, Any]:
-        self._maybe_transient("add_comment")
+        self._maybe_fail("add_comment")
         row = self.conn.execute(
             "SELECT tenant_id FROM tickets WHERE id=?", (ticket_id,)
         ).fetchone()
