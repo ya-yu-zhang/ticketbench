@@ -1,6 +1,6 @@
 # ticketbench
 
-**Agent Eval Harness** + thin fake-ticket **SUT** (LangGraph-style tool loop).
+**Agent Eval Harness** + thin fake-ticket **SUT** (real LangGraph `StateGraph` + scripted planner fallback).
 
 Interview story: prove an agent is *measurable* (final state + trajectory compliance), not another chat UI.
 
@@ -36,6 +36,13 @@ Holdout mirrors these with positive/negative pairs (authz refuse, same-tenant OK
 ticketbench-run smoke
 ticketbench-run holdout   # CI default (10/10 on current main)
 ticketbench-run tasks     # tunable set (≥20 on current main)
+```
+
+Optional SUT mode:
+
+```bash
+TICKETBENCH_SUT_MODE=langgraph ticketbench-run holdout   # default
+TICKETBENCH_SUT_MODE=scripted  ticketbench-run holdout   # no-key imperative fallback
 ```
 
 ## Non-goals
