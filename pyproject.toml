@@ -21,6 +21,7 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 ticketbench-run = "harness.runner.cli:main"
+ticketbench-panel = "harness.panel.build:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

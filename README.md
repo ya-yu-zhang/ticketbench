@@ -47,6 +47,15 @@ TICKETBENCH_SUT_MODE=langgraph ticketbench-run holdout   # default
 TICKETBENCH_SUT_MODE=scripted  ticketbench-run holdout   # no-key imperative fallback
 ```
 
+## Trace panel (static HTML)
+
+```bash
+for s in smoke holdout tasks divergence; do ticketbench-run $s --out harness/report/${s}_last.json; done
+ticketbench-panel harness/report/*_last.json -o harness/report/panel.html
+```
+
+Open `harness/report/panel.html` directly in a browser: per-step tool calls, `F_*` labels, final vs trajectory metrics, `sut_mode_actual`. Failed cases auto-expand; no server or network.
+
 ## Non-goals
 
 No public hosting, no paid cloud deps, no outbound messaging, no real ticket SaaS.

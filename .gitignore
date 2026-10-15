@@ -17,3 +17,4 @@ harness/report/*_ci.json
 .DS_Store
 .idea/
 .vscode/
+harness/report/panel.html
