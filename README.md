@@ -2,7 +2,7 @@
 
 **Agent Eval Harness** + thin fake-ticket **SUT** (real LangGraph `StateGraph` + scripted planner fallback).
 
-Interview story: prove an agent is *measurable* (final state + trajectory compliance), not another chat UI. Orchestration is a real LangGraph `StateGraph`; decisions stay a deterministic scripted planner (no API key).
+Interview story: prove an agent is *measurable* (final state + trajectory compliance), not another chat UI. Orchestration is a real LangGraph `StateGraph`; default decisions are a deterministic scripted planner. Optional `TICKETBENCH_SUT_MODE=llm` uses OpenRouter (default `nex-agi/nex-n2.5-mini`); CI stays scripted.
 
 Chinese brief / 中文简介：本地一键跑的 Agent 评测框架；被测件是可回滚的假工单 Agent，必演示熔断 / 重试 / 拒越权。
 
@@ -60,6 +60,19 @@ Optional SUT mode:
 TICKETBENCH_SUT_MODE=langgraph ticketbench-run holdout   # default
 TICKETBENCH_SUT_MODE=scripted  ticketbench-run holdout   # no-key imperative fallback
 ```
+
+
+## Live LLM mode (optional, OpenRouter)
+
+Default CI / interview baseline stays **scripted** (no API key). To try a real model:
+
+```bash
+export OPENROUTER_API_KEY=...          # never commit
+export OPENROUTER_MODEL=nex-agi/nex-n2.5-mini   # default
+TICKETBENCH_SUT_MODE=llm ticketbench-run smoke
+```
+
+`sut_mode_actual` becomes `llm`. Orchestration is still LangGraph; only the planner calls OpenRouter. Missing key → hard error (no silent fallback). See `.env.example`.
 
 ## Trace panel (static HTML)
 

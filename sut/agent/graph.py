@@ -22,6 +22,8 @@ class RunContext:
     store: TicketStore
     step: int = 0
     retries: int = 0
+    trajectory: list[Any] = field(default_factory=list)
+    last_observation: Any = None
 
 
 @dataclass
@@ -211,7 +213,7 @@ class AgentState(TypedDict, total=False):
     stop: bool
 
 
-def _build_langgraph(store: TicketStore, planner: Planner):
+def _build_langgraph(store: TicketStore, planner: Planner, *, per_step: bool = False):
     from langgraph.graph import END, StateGraph
 
     def agent_node(state: AgentState) -> dict[str, Any]:
@@ -233,7 +235,34 @@ def _build_langgraph(store: TicketStore, planner: Planner):
         loop_tool = state.get("loop_tool")
         planned = bool(state.get("planned"))
 
-        if not planned:
+        if per_step:
+            # Ask planner every turn (LLM). Empty plan => done.
+            last_obs = None
+            for e in reversed(traj):
+                if isinstance(e, dict) and e.get("type") in {
+                    "tool_result",
+                    "tool_error",
+                    "unauthorized",
+                }:
+                    last_obs = e
+                    break
+            ctx = RunContext(
+                task=state["task"],
+                store=store,
+                step=step,
+                retries=int(state.get("retries", 0)),
+                trajectory=traj,
+                last_observation=last_obs,
+            )
+            plan = planner(ctx)
+            if isinstance(plan, dict) and "loop_tool" in plan:
+                loop_tool = plan["loop_tool"]
+                pending = []
+            else:
+                pending = list(plan)  # type: ignore[arg-type]
+                loop_tool = None
+            planned = True
+        elif not planned:
             ctx = RunContext(task=state["task"], store=store, step=step, retries=int(state.get("retries", 0)))
             plan = planner(ctx)
             if isinstance(plan, dict) and "loop_tool" in plan:
@@ -254,8 +283,8 @@ def _build_langgraph(store: TicketStore, planner: Planner):
             return {"planned": planned, "pending": [], "loop_tool": None, "trajectory": traj, "stop": True}
 
         return {
-            "planned": planned,
-            "pending": pending,
+            "planned": False if per_step else planned,
+            "pending": [] if per_step else pending,
             "loop_tool": loop_tool,
             "pending_call": call,
         }
@@ -303,6 +332,8 @@ def _build_langgraph(store: TicketStore, planner: Planner):
     def route_after_tools(state: AgentState) -> Literal["agent", "finalize"]:
         if state.get("stop"):
             return "finalize"
+        if per_step:
+            return "agent"
         if state.get("loop_tool") is not None:
             return "agent"
         if state.get("pending"):
@@ -342,8 +373,10 @@ def _run_sut_langgraph(
     planner: Planner,
     max_steps: int,
     max_retries: int,
+    *,
+    per_step: bool = False,
 ) -> RunResult:
-    app = _build_langgraph(store, planner)
+    app = _build_langgraph(store, planner, per_step=per_step)
     init: AgentState = {
         "task": task,
         "max_steps": max_steps,
@@ -448,7 +481,7 @@ def run_sut(
     planner: Planner | None = None,
     mode: str | None = None,
 ) -> RunResult:
-    """Run SUT. Default mode=langgraph; set TICKETBENCH_SUT_MODE=scripted for explicit imperative path.
+    """Run SUT. Default mode=langgraph; `scripted` = imperative; `llm` = LangGraph + OpenRouter planner.
 
     Graph failures are NOT swallowed on the default/CI path. Opt-in only via
     TICKETBENCH_SUT_ALLOW_FALLBACK=1 (logs + sut_mode_actual=scripted_fallback).
@@ -481,6 +514,19 @@ def run_sut(
         if mode == "scripted":
             result = _run_sut_scripted(task, store, planner, max_steps, max_retries)
             result.sut_mode_actual = "scripted"
+            return result
+        if mode == "llm":
+            from sut.agent.llm_planner import LlmStepPlanner
+
+            # Fail fast if key missing (validated inside first call / constructor path).
+            from sut.agent import openrouter as _or
+
+            _or.get_api_key()
+            llm_planner: Planner = planner if planner is not default_scripted_planner else LlmStepPlanner()
+            result = _run_sut_langgraph(
+                task, store, llm_planner, max_steps, max_retries, per_step=True
+            )
+            result.sut_mode_actual = "llm"
             return result
         try:
             result = _run_sut_langgraph(task, store, planner, max_steps, max_retries)
