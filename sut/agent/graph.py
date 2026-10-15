@@ -236,7 +236,7 @@ def _build_langgraph(store: TicketStore, planner: Planner, *, per_step: bool = F
         planned = bool(state.get("planned"))
 
         if per_step:
-            # Ask planner every turn (LLM). Empty plan => done.
+            # Ask planner every turn (LLM). Empty plan is "done" only if tools already ran.
             last_obs = None
             for e in reversed(traj):
                 if isinstance(e, dict) and e.get("type") in {
@@ -254,7 +254,24 @@ def _build_langgraph(store: TicketStore, planner: Planner, *, per_step: bool = F
                 trajectory=traj,
                 last_observation=last_obs,
             )
-            plan = planner(ctx)
+            try:
+                plan = planner(ctx)
+            except Exception as exc:  # noqa: BLE001 — surface as refused, not crash suite
+                traj.append(
+                    {
+                        "type": "planner_error",
+                        "data": {"error": type(exc).__name__, "msg": str(exc)[:300]},
+                    }
+                )
+                return {
+                    "status": "refused",
+                    "refusal_reason": "planner_error",
+                    "trajectory": traj,
+                    "stop": True,
+                    "planned": True,
+                    "pending": [],
+                    "loop_tool": None,
+                }
             if isinstance(plan, dict) and "loop_tool" in plan:
                 loop_tool = plan["loop_tool"]
                 pending = []
@@ -279,6 +296,27 @@ def _build_langgraph(store: TicketStore, planner: Planner, *, per_step: bool = F
             call = pending[0]
             pending = pending[1:]
         else:
+            had_tool = any(
+                isinstance(e, dict) and e.get("type") == "tool_call" for e in traj
+            )
+            if per_step and not had_tool:
+                # Early {"done":true} / empty plan with zero tools → refuse (not fake success).
+                traj.append(
+                    {
+                        "type": "planner_error",
+                        "data": {"error": "empty_plan", "msg": "no tool calls before done"},
+                    }
+                )
+                traj.append({"type": "finalize", "data": {"status": "refused"}})
+                return {
+                    "status": "refused",
+                    "refusal_reason": "llm_no_action",
+                    "planned": planned,
+                    "pending": [],
+                    "loop_tool": None,
+                    "trajectory": traj,
+                    "stop": True,
+                }
             traj.append({"type": "finalize", "data": {"status": state.get("status", "success")}})
             return {"planned": planned, "pending": [], "loop_tool": None, "trajectory": traj, "stop": True}
 

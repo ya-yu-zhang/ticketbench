@@ -10,6 +10,7 @@ from typing import Any
 
 DEFAULT_MODEL = "nex-agi/nex-n2.5-mini"
 DEFAULT_BASE = "https://openrouter.ai/api/v1"
+DEFAULT_MAX_TOKENS = 512
 
 
 class OpenRouterError(RuntimeError):
@@ -25,16 +26,43 @@ def get_api_key() -> str:
     return key
 
 
+def _message_text(message: dict[str, Any]) -> str:
+    """Some models put usable text in reasoning when content is null."""
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text") or ""))
+            elif isinstance(block, str):
+                parts.append(block)
+        joined = "".join(parts).strip()
+        if joined:
+            return joined
+    for key in ("reasoning", "reasoning_content"):
+        val = message.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+    raise OpenRouterError(
+        "OpenRouter message content is empty/null "
+        "(and no reasoning text); raise max_tokens or check model"
+    )
+
+
 def chat_completion(
     messages: list[dict[str, str]],
     *,
     model: str | None = None,
     temperature: float = 0.0,
-    max_tokens: int = 256,
+    max_tokens: int | None = None,
 ) -> str:
     key = get_api_key()
     model = model or os.environ.get("OPENROUTER_MODEL") or DEFAULT_MODEL
     base = (os.environ.get("OPENROUTER_BASE_URL") or DEFAULT_BASE).rstrip("/")
+    if max_tokens is None:
+        max_tokens = int(os.environ.get("OPENROUTER_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
     body = {
         "model": model,
         "messages": messages,
@@ -62,6 +90,9 @@ def chat_completion(
         raise OpenRouterError(f"OpenRouter network error: {e}") from e
 
     try:
-        return str(payload["choices"][0]["message"]["content"])
+        message = payload["choices"][0]["message"]
     except (KeyError, IndexError, TypeError) as e:
         raise OpenRouterError(f"unexpected OpenRouter response shape: {payload!r}"[:400]) from e
+    if not isinstance(message, dict):
+        raise OpenRouterError("OpenRouter message is not an object")
+    return _message_text(message)

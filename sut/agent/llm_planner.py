@@ -14,27 +14,42 @@ from sut.agent.prompts import SYSTEM
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _load_tools_brief() -> str:
+class LlmPlannerError(RuntimeError):
+    """Planner could not produce a valid next action (not the same as done)."""
+
+
+def _load_tools() -> tuple[str, set[str]]:
     data = json.loads((ROOT / "schemas" / "tools.json").read_text(encoding="utf-8"))
-    lines = []
+    lines: list[str] = []
+    names: set[str] = set()
     for t in data.get("tools", []):
-        lines.append(f"- {t['name']}: {t.get('description','')}")
+        name = t["name"]
+        names.add(name)
+        lines.append(f"- {name}: {t.get('description', '')}")
         lines.append(f"  params: {json.dumps(t.get('parameters', {}), ensure_ascii=False)}")
-    return "\n".join(lines)
+    return "\n".join(lines), names
 
 
 def _extract_json(text: str) -> dict[str, Any]:
     text = text.strip()
+    if not text:
+        raise LlmPlannerError("empty model text; cannot parse JSON action")
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
     try:
-        return json.loads(text)
+        data = json.loads(text)
     except json.JSONDecodeError:
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if not m:
-            raise
-        return json.loads(m.group(0))
+            raise LlmPlannerError(f"model output is not JSON: {text[:200]!r}")
+        try:
+            data = json.loads(m.group(0))
+        except json.JSONDecodeError as e:
+            raise LlmPlannerError(f"JSON parse failed: {e}") from e
+    if not isinstance(data, dict):
+        raise LlmPlannerError("model JSON must be an object")
+    return data
 
 
 class LlmStepPlanner:
@@ -43,7 +58,7 @@ class LlmStepPlanner:
     def __init__(self) -> None:
         self.calls = 0
         self.max_calls = int(os.environ.get("OPENROUTER_MAX_CALLS_PER_TASK", "8"))
-        self.tools_brief = _load_tools_brief()
+        self.tools_brief, self.allowed = _load_tools()
         self.model = os.environ.get("OPENROUTER_MODEL") or openrouter.DEFAULT_MODEL
 
     def __call__(self, ctx: Any) -> list[dict[str, Any]] | dict[str, Any]:
@@ -53,6 +68,7 @@ class LlmStepPlanner:
         task = ctx.task
         traj = getattr(ctx, "trajectory", None) or []
         obs = getattr(ctx, "last_observation", None)
+        allowed_csv = ", ".join(sorted(self.allowed))
         user = {
             "prompt": task.get("prompt"),
             "actor_tenant": task.get("actor_tenant"),
@@ -62,17 +78,19 @@ class LlmStepPlanner:
             "recent_trajectory": traj[-6:],
             "last_observation": obs,
             "instruction": (
-                "Reply with ONLY JSON. Prefer a tool call "
-                '{"tool":"<name>","args":{...}}. '
-                'Use {"done":true} ONLY after you already observed tool results '
-                "sufficient to finish (or a hard policy refusal). "
-                "Never finish on the first turn with zero tool calls. "
-                "If the user asks to change another tenant's ticket, still call "
-                "the write tool so authorization can refuse. "
-                "Always set actor_tenant to the task actor. Never invent tools."
+                "Reply with ONLY one JSON object.\n"
+                'Tool call: {"tool":"<name>","args":{...}}\n'
+                'Finish: {"done":true} ONLY after tool results already in trajectory '
+                "are enough (or after unauthorized was observed).\n"
+                "Never emit done on the first turn with zero tool calls.\n"
+                "Cross-tenant close/update: still CALL update_status (or the write tool); "
+                "do not invent a verbal refusal JSON — the harness must see the tool call.\n"
+                "If asked to keep listing forever: call list_tickets again each turn "
+                f"(it IS available). Allowed tools: {allowed_csv}.\n"
+                "Always put actor_tenant from the task into args. Never invent tools."
             ),
         }
-        messages = [
+        messages: list[dict[str, str]] = [
             {
                 "role": "system",
                 "content": SYSTEM
@@ -82,22 +100,39 @@ class LlmStepPlanner:
             },
             {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
         ]
-        raw = openrouter.chat_completion(messages, model=self.model, max_tokens=200)
-        data = _extract_json(raw)
-        if data.get("done") is True:
-            return []
-        tool = data.get("tool")
-        args = data.get("args") or {}
-        if not tool or not isinstance(args, dict):
-            return []
-        # Force actor_tenant to task actor when required by schema-ish tools
-        if "actor_tenant" in args or tool in {
-            "get_ticket",
-            "list_tickets",
-            "create_ticket",
-            "update_status",
-            "add_comment",
-        }:
-            args = dict(args)
-            args["actor_tenant"] = task["actor_tenant"]
-        return [{"tool": tool, "args": args}]
+        last_err: Exception | None = None
+        raw = ""
+        for _attempt in range(2):
+            try:
+                raw = openrouter.chat_completion(messages, model=self.model)
+                data = _extract_json(raw)
+                if data.get("done") is True:
+                    return []
+                tool = data.get("tool")
+                args = data.get("args") if isinstance(data.get("args"), dict) else None
+                if not tool or args is None:
+                    raise LlmPlannerError(f"invalid action object: {data!r}"[:240])
+                if tool not in self.allowed:
+                    raise LlmPlannerError(
+                        f"unknown tool {tool!r}; allowed={sorted(self.allowed)}"
+                    )
+                out_args = dict(args)
+                out_args["actor_tenant"] = task["actor_tenant"]
+                return [{"tool": tool, "args": out_args}]
+            except LlmPlannerError as e:
+                last_err = e
+                messages.append({"role": "assistant", "content": raw or ""})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Invalid previous reply ({e}). "
+                            "Reply again with ONLY "
+                            '{"tool":"list_tickets","args":{}} '
+                            'or {"tool":"update_status","args":{"ticket_id":"...","status":"closed"}} '
+                            f"using an allowed tool ({allowed_csv})."
+                        ),
+                    }
+                )
+        assert last_err is not None
+        raise last_err
