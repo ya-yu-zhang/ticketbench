@@ -20,6 +20,8 @@ jobs:
             echo "Harness must not read SUT prompts" >&2
             exit 1
           fi
+      - name: Public hygiene (noreply authors + no secret paths)
+        run: bash scripts/check_public_hygiene.sh
       - name: Holdout gate
         run: ticketbench-run holdout --out harness/report/holdout_ci.json
       - name: Upload holdout report

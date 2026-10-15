@@ -88,4 +88,13 @@ Formal `.github/workflows` still needs `workflow` token scope — draft at `harn
 
 ## Secrets
 
+Before pushing to the public remote:
+
+```bash
+bash scripts/check_public_hygiene.sh
+```
+
+Checks: no `.env` / key-like paths in the git index; author emails on commits you are about to push must be `*@users.noreply.github.com`. Historical authors are warned only (this repo does not rewrite history).
+
+
 Do **not** commit API keys. If you later wire a live LLM, use environment variables (e.g. `OPENAI_API_KEY`) and a local `.env` that is gitignored. This repo ships with no `.env` and no credentials.
