@@ -53,14 +53,15 @@ No public hosting, no paid cloud deps, no outbound messaging, no real ticket Saa
 
 ## Status
 
-**W0** closed on isolation + holdout 10/10 + smoke 3/3 (scripted planner).
+**W0** closed: isolation + holdout 10/10 + smoke 3/3.
 
-**W1 (current `main`)**:
-- Metrics split: `final_accuracy` = mean(`final_ok`), `trajectory_compliance` = mean(`trajectory_ok`) (independent; overall pass requires both)
-- **`harness/tasks`: 20/20** (create / same-tenant / list / authz / tripwire / retry / validation)
-- Holdout still **10/10**; smoke **3/3**
-- Scripted planner remains the honest no-key mode; real LangGraph `StateGraph` still queued
-- Formal `.github/workflows` still needs `workflow` token scope — draft at `harness/ci_draft/ci.yml.example`; static panel in W4
+**W1** passed: metrics split (`final_accuracy` / `trajectory_compliance`); **`harness/tasks` 20/20**.
+
+**SUT**: real LangGraph `StateGraph` by default; `TICKETBENCH_SUT_MODE=scripted` (and runtime fallback) keeps the no-key imperative loop. Planner stays deterministic scripted (no API key).
+
+**W2** (current `main`): `evals/divergence` (**2**) proves metric fork — suite exits 0 iff every case is `final_ok && !trajectory_ok` (`final_accuracy=1.0`, `trajectory_compliance=0.0`). **Not** a CI holdout gate.
+
+Formal `.github/workflows` still needs `workflow` token scope — draft at `harness/ci_draft/ci.yml.example`; W4: static panel.
 
 ## Secrets
 
