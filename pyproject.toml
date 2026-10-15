@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ticketbench"
+version = "0.1.0"
+description = "Agent Eval Harness with a thin fake-ticket LangGraph SUT"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "ya-yu-zhang" }]
+dependencies = [
+  "pydantic>=2.6",
+  "langgraph>=0.2",
+  "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ticketbench-run = "harness.runner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["harness*", "sut*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

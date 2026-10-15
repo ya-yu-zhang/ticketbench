@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Holdout gate
+        run: ticketbench-run holdout --out harness/report/holdout_ci.json
+      - name: Isolation check (must not import prompts in harness)
+        run: |
+          if grep -R "sut.agent.prompts" harness -n; then
+            echo "Harness must not read SUT prompts" >&2
+            exit 1
+          fi

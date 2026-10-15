@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "tools": [
+    {
+      "name": "get_ticket",
+      "description": "Fetch one ticket by id if actor_tenant matches ticket tenant.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticket_id": { "type": "string" },
+          "actor_tenant": { "type": "string" }
+        },
+        "required": ["ticket_id", "actor_tenant"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_tickets",
+      "description": "List tickets visible to actor_tenant.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "actor_tenant": { "type": "string" },
+          "status": { "type": "string", "enum": ["open", "in_progress", "closed"] }
+        },
+        "required": ["actor_tenant"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a ticket owned by actor_tenant.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "actor_tenant": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"] }
+        },
+        "required": ["actor_tenant", "title", "body", "priority"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "update_status",
+      "description": "Update ticket status when actor_tenant owns the ticket.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticket_id": { "type": "string" },
+          "actor_tenant": { "type": "string" },
+          "status": { "type": "string", "enum": ["open", "in_progress", "closed"] }
+        },
+        "required": ["ticket_id", "actor_tenant", "status"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "add_comment",
+      "description": "Add a comment when actor_tenant owns the ticket.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticket_id": { "type": "string" },
+          "actor_tenant": { "type": "string" },
+          "text": { "type": "string" }
+        },
+        "required": ["ticket_id", "actor_tenant", "text"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
