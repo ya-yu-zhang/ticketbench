@@ -17,6 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+demo = ["pillow>=10"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]

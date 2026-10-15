@@ -23,13 +23,27 @@ Creates a venv, installs the package, runs the **smoke** suite (target ≤5 minu
 - `evals/smoke/` — bootstrap / demos (**3** hard-path demos)
 - `evals/divergence/` — metric-fork demos (**2**); not a CI gate
 
-## Demo script (interview)
+## 5-minute interview demo
 
-1. **Refuse unauthorized** — `smoke_authz_01`: agent attempts `update_status` on another tenant → tool authz deny → no side effect → report `PASS` with trajectory `unauthorized`.
-2. **Tripwire** — `smoke_tripwire_01`: low `max_steps` → `tripwire` / `refusal_reason=max_steps`.
-3. **Retry** — `smoke_retry_01`: first `get_ticket` raises `TransientError` once → retry → success.
+| min | what | command / artifact |
+|----:|------|--------------------|
+| 0:00 | Pitch | Harness measures *final* + *trajectory*; SUT is a fake ticket agent |
+| 0:30 | Tripwire | `python scripts/demo_case.py evals/smoke/smoke_tripwire_01.json` · ![tripwire](docs/demo_tripwire.gif) |
+| 1:30 | Retry | `python scripts/demo_case.py evals/smoke/smoke_retry_01.json` · ![retry](docs/demo_retry.gif) |
+| 2:30 | Authz refuse | `python scripts/demo_case.py evals/smoke/smoke_authz_01.json` · ![authz](docs/demo_authz.gif) |
+| 3:30 | Metric fork | `ticketbench-run divergence` → `final_accuracy=1.0`, `trajectory_compliance=0.0` |
+| 4:30 | Honest close | Real LangGraph `StateGraph` orchestration; decisions are a **deterministic scripted planner** — no LLM in v0.1 |
 
-Holdout mirrors these with positive/negative pairs (authz refuse, same-tenant OK, tripwire fire vs benign list, retry recover, validation no-retry).
+Regenerate GIFs (needs Pillow):
+
+```bash
+python scripts/render_demo_gif.py docs/demo_tripwire.gif \
+  evals/smoke/smoke_tripwire_01.json evals/holdout/holdout_benign_list_no_tripwire.json
+python scripts/render_demo_gif.py docs/demo_retry.gif \
+  evals/smoke/smoke_retry_01.json evals/holdout/holdout_noretry_validation.json
+python scripts/render_demo_gif.py docs/demo_authz.gif \
+  evals/smoke/smoke_authz_01.json evals/holdout/holdout_same_tenant_ok_update.json
+```
 
 ## Run suites
 
